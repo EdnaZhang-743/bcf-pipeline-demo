@@ -2,3 +2,5 @@ requests>=2.31
 pandas>=2.0
 matplotlib>=3.7
 flask>=3.0
+pydantic>=2.0
+pytest>=8.0

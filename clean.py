@@ -16,6 +16,9 @@ data/raw/*.json 看看实际字段名，按需调整下面的列名。
 import json
 import pandas as pd
 from pathlib import Path
+from pydantic import ValidationError
+
+from schemas import CleanedIndicatorRecord
 
 RAW_DIR = Path(__file__).parent / "data" / "raw"
 OUTPUT_CSV = Path(__file__).parent / "data" / "cleaned.csv"
@@ -45,10 +48,11 @@ def clean_records(records: list[dict]) -> pd.DataFrame:
 
     # 决策2.5：只保留女性数据——乳腺癌男性病例极少，
     # 混在一起会让"平均值"失去意义，分析时也没法讲清楚趋势
-    before_sex_filter = len(df)
-    df = df[df["sex"] == "SEX_FMLE"]
-    print(f"[clean] kept {len(df)}/{before_sex_filter} rows after filtering to female only")
-    
+    if "sex" in df.columns:
+        before_sex_filter = len(df)
+        df = df[df["sex"] == "SEX_FMLE"]
+        print(f"[clean] kept {len(df)}/{before_sex_filter} rows after filtering to female only")
+
     # 决策3：处理缺失值——丢弃并打印数量，而不是静默填充
     if "value" in df.columns:
         before = len(df)
@@ -71,6 +75,26 @@ def clean_records(records: list[dict]) -> pd.DataFrame:
 
     return df.reset_index(drop=True)
 
+def validate_records(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    用 schemas.CleanedIndicatorRecord 逐行校验，把不符合预期结构/范围的行
+    单独挑出来丢弃并打印，而不是让脏数据悄悄流入数据库。
+    """
+    valid_rows = []
+    errors = []
+    for i, row in df.iterrows():
+        try:
+            validated = CleanedIndicatorRecord(**row.to_dict())
+            valid_rows.append(validated.model_dump())
+        except ValidationError as e:
+            errors.append((i, str(e)))
+
+    if errors:
+        print(f"[clean] {len(errors)} row(s) failed schema validation and were dropped:")
+        for i, err in errors[:5]:
+            print(f"  row {i}: {err.splitlines()[0]}")
+
+    return pd.DataFrame(valid_rows)
 
 if __name__ == "__main__":
     raw_files = sorted(RAW_DIR.glob("*.json"))
@@ -82,6 +106,7 @@ if __name__ == "__main__":
     records = load_raw(latest_raw)
 
     df = clean_records(records)
+    df = validate_records(df)
     OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUTPUT_CSV, index=False)
 
