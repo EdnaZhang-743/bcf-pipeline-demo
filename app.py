@@ -5,7 +5,7 @@ app.py（可选加分项）
 对应JD里 "build, consume and integrate APIs" 这条要求。
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 import sqlite3
 from pathlib import Path
 
@@ -21,6 +21,12 @@ def query_db(sql: str, params: tuple = ()):
     rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+
+@app.route("/")
+def index():
+    """提供极简前端页面，可视化 top/bottom API 的结果"""
+    return send_from_directory("static", "index.html")
 
 
 @app.route("/health")
@@ -69,4 +75,4 @@ def get_country(country_code: str):
 if __name__ == "__main__":
     if not DB_PATH.exists():
         raise FileNotFoundError("No database found. Run fetch.py -> clean.py -> store.py first.")
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

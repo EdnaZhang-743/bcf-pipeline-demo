@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Breast Cancer Death Rate — Country Comparison</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, sans-serif;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #222;
+  }
+  h1 { font-size: 22px; }
+  p.subtitle { color: #666; margin-top: -8px; }
+  .columns { display: flex; gap: 40px; margin-top: 30px; }
+  .column { flex: 1; }
+  .column h2 { font-size: 16px; margin-bottom: 12px; }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .bar-label { width: 40px; flex-shrink: 0; }
+  .bar-track { flex: 1; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 18px; border-radius: 3px; }
+  .bar-value { width: 45px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .top .bar-fill { background: #dc143c; }
+  .bottom .bar-fill { background: #4682b4; }
+  .note { margin-top: 30px; font-size: 13px; color: #666; line-height: 1.5; }
+  .error { color: #b00020; }
+</style>
+</head>
+<body>
+  <h1>Breast Cancer Death Rate — Country Comparison</h1>
+  <p class="subtitle">Age-standardized death rate per 100,000 (female, WHO GHO, 2004 snapshot)</p>
+
+  <div class="columns">
+    <div class="column top">
+      <h2>Highest 10</h2>
+      <div id="top-list">Loading...</div>
+    </div>
+    <div class="column bottom">
+      <h2>Lowest 10</h2>
+      <div id="bottom-list">Loading...</div>
+    </div>
+  </div>
+
+  <p class="note">
+    Note: this indicator only covers a single year (2004), so this shows a
+    cross-country comparison rather than a time trend. The 10x+ gap between
+    the two groups likely reflects differences in medical reporting/diagnostic
+    capacity across countries, not necessarily true incidence differences.
+  </p>
+
+  <script>
+    function renderBars(containerId, data, maxValue) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      data.forEach(row => {
+        const pct = (row.value / maxValue) * 100;
+        const rowEl = document.createElement("div");
+        rowEl.className = "bar-row";
+        rowEl.innerHTML = `
+          <div class="bar-label">${row.country_code}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="bar-value">${row.value}</div>
+        `;
+        container.appendChild(rowEl);
+      });
+    }
+
+    async function loadData() {
+      try {
+        const [topRes, bottomRes] = await Promise.all([
+          fetch("/indicator/top"),
+          fetch("/indicator/bottom"),
+        ]);
+        const top = await topRes.json();
+        const bottom = await bottomRes.json();
+
+        const maxValue = Math.max(...top.map(r => r.value));
+        renderBars("top-list", top, maxValue);
+        renderBars("bottom-list", bottom, maxValue);
+      } catch (err) {
+        document.getElementById("top-list").innerHTML =
+          `<span class="error">Failed to load data. Is app.py running?</span>`;
+        console.error(err);
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
