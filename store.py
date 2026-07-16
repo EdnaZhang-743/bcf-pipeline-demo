@@ -1,13 +1,15 @@
 """
 store.py
-把清洗后的 CSV 加载进 SQLite 数据库。
+Load the cleaned CSV into the SQLite database.
 
-设计决策（面试时可以讲）：
-1. 用 SQLite 而不是 Postgres——demo阶段够快够简单，不需要额外起服务；
-   如果要多人协作/部署到服务器，换成 Postgres + 连接池是很自然的下一步。
-2. 在 DB 层也加 UNIQUE 约束，而不是只在 pandas 里去重——
-   数据校验不能只在应用层做一次，DB 约束是最后一道防线，
-   防止未来别的脚本绕过 clean.py 直接写入脏数据。
+Design decisions:
+1. Used SQLite instead of PostgreSQL 
+   it is fast and simple enough for the demo phase and requires no additional server setup;
+   switching to PostgreSQL with connection pooling would be a natural next step if moving to multi-user collaboration or server deployment.
+
+2. Implemented `UNIQUE` constraints at the database level rather than relying solely on pandas for deduplication
+   data validation shouldn't happen only at the application layer; database constraints serve as the final line of defense,
+   preventing other scripts from bypassing `clean.py` and writing "dirty" data in the future.
 """
 
 import sqlite3
@@ -36,8 +38,6 @@ def load_to_db(df: pd.DataFrame, db_path: Path = DB_PATH):
     conn = sqlite3.connect(db_path)
     create_schema(conn)
 
-    # 用 INSERT OR IGNORE 语义：借助 pandas to_sql 的 replace 简化 demo，
-    # 生产场景更推荐显式 upsert 逻辑，这里作为 next step 提一下即可。
     df.to_sql("health_indicator", conn, if_exists="replace", index=False)
 
     count = conn.execute("SELECT COUNT(*) FROM health_indicator").fetchone()[0]

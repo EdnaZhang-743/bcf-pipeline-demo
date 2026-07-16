@@ -1,6 +1,6 @@
 """
 tests/test_store.py
-测试数据库层的核心保证：schema建表正常、唯一约束真的能挡住重复数据。
+Core guarantees for database-level testing: table schemas are created correctly, and unique constraints effectively block duplicate data.
 """
 
 import sys

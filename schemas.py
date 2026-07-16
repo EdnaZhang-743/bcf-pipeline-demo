@@ -1,6 +1,6 @@
 """
 schemas.py
-用 pydantic 定义清洗后数据应该满足的结构，在写入数据库前做一次校验。
+Use Pydantic to define the required structure for the cleaned data and perform validation before writing it to the database.
 """
 
 from pydantic import BaseModel, field_validator

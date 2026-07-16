@@ -1,6 +1,6 @@
 """
 tests/test_clean.py
-针对 clean.py 里最有决策含量的部分写测试。
+Write tests for the most critical decision-making parts of `clean.py`.
 """
 
 import sys

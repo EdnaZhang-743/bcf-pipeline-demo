@@ -1,7 +1,7 @@
 """
 analyze.py
-对 SQLite 里的数据做一个简单的趋势分析，并输出一张折线图。
-不追求花哨的dashboard，重点是"能不能用数据回答一个具体问题"。
+Perform a cross-country comparison of data from SQLite and generate a bar chart 
+Displaying the 10 countries with the highest and lowest mortality rates.
 """
 
 import sqlite3
@@ -15,8 +15,7 @@ CHART_PATH = Path(__file__).parent / "data" / "trend.png"
 
 def get_top_bottom_countries(conn: sqlite3.Connection, n: int = 10) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    数据只覆盖单一年份，不支持时间趋势分析，
-    所以改为横向对比各国死亡率的高低排名。
+    A cross-country comparison of mortality rate rankings.
     """
     top = pd.read_sql(f"""
         SELECT country_code, value

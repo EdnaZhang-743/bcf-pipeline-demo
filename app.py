@@ -1,8 +1,7 @@
 """
-app.py（可选加分项）
-在清洗好的数据上暴露一个只读小API，模拟真实场景里
-其他系统（比如BCFNZ的register platform）怎么消费这份数据。
-对应JD里 "build, consume and integrate APIs" 这条要求。
+app.py
+Expose a small, read-only API based on the cleaned data
+Simulate how other systems (such as BCFNZ's registration platform) would consume this data in a real-world scenario.
 """
 
 from flask import Flask, jsonify, send_from_directory
@@ -25,19 +24,19 @@ def query_db(sql: str, params: tuple = ()):
 
 @app.route("/")
 def index():
-    """提供极简前端页面，可视化 top/bottom API 的结果"""
+    """Provides a minimalist frontend page to visualize the results of top/bottom API calls."""
     return send_from_directory("static", "index.html")
 
-
+# Health check endpoint
 @app.route("/health")
 def health_check():
     """基本的健康检查endpoint——运维/监控最先会打的接口"""
     return jsonify({"status": "ok"})
 
-
+# Top/Bottom Interface
 @app.route("/indicator/top")
 def get_top():
-    """死亡率最高的10个国家"""
+    """The 10 countries with the highest mortality rates"""
     rows = query_db("""
         SELECT country_code, value
         FROM health_indicator
@@ -49,7 +48,7 @@ def get_top():
 
 @app.route("/indicator/bottom")
 def get_bottom():
-    """死亡率最低的10个国家"""
+    """The 10 countries with the lowest mortality rates"""
     rows = query_db("""
         SELECT country_code, value
         FROM health_indicator
@@ -58,7 +57,7 @@ def get_bottom():
     """)
     return jsonify(rows)
 
-
+# Query interface by country
 @app.route("/indicator/country/<country_code>")
 def get_country(country_code: str):
     rows = query_db("""

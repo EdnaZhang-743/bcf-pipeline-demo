@@ -1,16 +1,18 @@
 """
 clean.py
-把 fetch.py 存下来的原始 JSON 清洗成一份干净的 CSV。
+Use pandas to clean the raw JSON saved by fetch.py ​​into a clean CSV file.
 
-设计决策（面试时可以讲）：
-1. 只保留国家级别的数据，丢掉地区/全球汇总的行——避免统计时重复计数。
-2. 缺失值选择丢弃而非填充——对于趋势分析来说，填充（比如填0或均值）会
-   严重扭曲结果；丢弃前会打印丢了多少行，方便追溯。
-3. 用 UNIQUE 组合键 (country_code, year, sex) 去重，保留第一条。
-4. 显式做类型转换，避免下游数据库/分析阶段因为字符串类型的数字出问题。
+Design Decisions:
+1. Retain only country-level data and discard regional or global aggregate rows to avoid double-counting during analysis.
+2. Retain only data for females (discarding data for males and combined totals).
+3. Drop missing values ​​rather than imputing them; for trend analysis, imputation (e.g., filling with 0 or the mean) would
+   severely distort the results. The number of dropped rows is logged to facilitate traceability.
+4. Deduplicate using the composite key `(country_code, year, sex)`, keeping the first occurrence.
+5. Standardize field types to the correct numeric format to prevent issues in downstream database/analysis caused by numeric values ​​stored as strings.
+6. Perform a final validation using Pydantic to filter out rows that do not comply with expected rules.
 
-注意：不同 indicator 返回的字段可能略有差异，运行前建议先打开一份
-data/raw/*.json 看看实际字段名，按需调整下面的列名。
+Note: The fields returned by different indicators may vary slightly. 
+Before running the code, it is recommended to open a file from `data/raw/*.json` to check the actual field names and adjust the column names below as needed.
 """
 
 import json
@@ -26,17 +28,17 @@ OUTPUT_CSV = Path(__file__).parent / "data" / "cleaned.csv"
 
 def load_raw(filepath: Path) -> list[dict]:
     raw = json.loads(filepath.read_text())
-    return raw["value"]  # GHO API 的实际数据都在 value 字段里
+    return raw["value"]  # The actual data from the GHO API is contained within the `value` field.
 
 
 def clean_records(records: list[dict]) -> pd.DataFrame:
-    df = pd.DataFrame(records)
+    df = pd.DataFrame(records)  # Convert a list of raw data—composed of individual dictionaries—into a pandas DataFrame.
 
-    # 决策1：只保留国家级别的数据
+    # Decision 1: Retain only country-level data and discard rows containing regional or global aggregates to avoid duplication.
     if "SpatialDimType" in df.columns:
         df = df[df["SpatialDimType"] == "COUNTRY"]
 
-    # 决策2：挑出需要的列，重命名成清晰的名字
+    # Decision 2: Select the required columns and rename them with clear names.
     keep_cols = ["SpatialDim", "TimeDim", "Dim1", "NumericValue"]
     keep_cols = [c for c in keep_cols if c in df.columns]
     df = df[keep_cols].rename(columns={
@@ -46,26 +48,26 @@ def clean_records(records: list[dict]) -> pd.DataFrame:
         "NumericValue": "value",
     })
 
-    # 决策2.5：只保留女性数据——乳腺癌男性病例极少，
-    # 混在一起会让"平均值"失去意义，分析时也没法讲清楚趋势
+    # Decision 2.5: Only retain female data – there are very few male cases of breast cancer.
+    # Mixing them together renders the "average" meaningless and makes it impossible to clearly explain trends during analysis.
     if "sex" in df.columns:
         before_sex_filter = len(df)
         df = df[df["sex"] == "SEX_FMLE"]
         print(f"[clean] kept {len(df)}/{before_sex_filter} rows after filtering to female only")
 
-    # 决策3：处理缺失值——丢弃并打印数量，而不是静默填充
+    # Decision 3: Handle missing values—drop them and print the count, rather than silently imputing them.
     if "value" in df.columns:
         before = len(df)
         df = df.dropna(subset=["value"])
         print(f"[clean] dropped {before - len(df)} rows with missing value")
 
-    # 决策4：类型转换
+    # Decision 4: Type Conversion
     if "year" in df.columns:
         df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
     if "value" in df.columns:
         df["value"] = pd.to_numeric(df["value"], errors="coerce")
 
-    # 决策5：去重
+    # Decision 5: Deduplication
     dedup_cols = [c for c in ["country_code", "year", "sex"] if c in df.columns]
     if dedup_cols:
         dupe_count = df.duplicated(subset=dedup_cols).sum()
@@ -77,8 +79,8 @@ def clean_records(records: list[dict]) -> pd.DataFrame:
 
 def validate_records(df: pd.DataFrame) -> pd.DataFrame:
     """
-    用 schemas.CleanedIndicatorRecord 逐行校验，把不符合预期结构/范围的行
-    单独挑出来丢弃并打印，而不是让脏数据悄悄流入数据库。
+    Use schemas.CleanedIndicatorRecord to validate each line and remove lines that do not conform to the expected structure/range
+    remove and print instead of allowing dirty data to quietly flow into the database.
     """
     valid_rows = []
     errors = []
